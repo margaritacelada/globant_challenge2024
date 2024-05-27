@@ -183,4 +183,38 @@ async def hired_employees_q():
 
     return Response(df.to_json(orient="records"), media_type="application/json")
 
+@app_globant.get("/hired_employees_dep")
+async def hired_employees_dep():
+     # check if there's data
+    for table in allowed_tables:
+        with engine.connect() as con:
+            result = con.execute(text(f"SELECT count(1) FROM {table}")).fetchall()
+            if result is None or [x[0] for x in result][0] == 0: 
+                raise HTTPException(status_code=404, detail=f"There's no data in {table} or table doesn't exist")
+            
+     # get metrics
+    query = """
+            SELECT 
+                h.department_id AS id,
+                d.department AS department,
+                COUNT(h.id) AS hired
+            FROM hired_employees AS h
+                JOIN departments AS d ON h.department_id=d.id
+            WHERE strftime('%Y', datetime) = '2021'
+            GROUP BY h.department_id,d.department
+            HAVING COUNT(h.id) > (
+                SELECT 
+                    COUNT(h.id)/(SELECT COUNT(id) FROM departments)
+                FROM hired_employees h
+                WHERE strftime('%Y', h.datetime) = '2021'
+            )
+            ORDER BY hired DESC
+            ;
+        """
+    df = pd.read_sql(query, engine)
+    # only for data visualization
+    # file_name =  FILE_ROUTE + f'metrics\\hired_employees_greater_mean.csv'
+    # df.to_csv(file_name,index=False) # only for data visualization
 
+    return Response(df.to_json(orient="records"), media_type="application/json")
+    
