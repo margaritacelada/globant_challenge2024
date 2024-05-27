@@ -16,7 +16,7 @@
 
 Challenge 1
 - Call post method to ingest historical data: 
-`curl -X POST -H "Content-Type: application/json" -d '{"file_name":"departments","table_name":"departments","nrows":"1000"}' 'http://127.0.0.1:8000/batch_load'` 
+`curl -X POST -H "Content-Type: application/json" -d '{"file_name":"departments","table_name":"departments","ini_row":"1","final_row":"1000"}' 'http://127.0.0.1:8000/batch_load'` 
 
 - Call post method to create a backup table in avro format
 `curl -X POST -H "Content-Type: application/json" -d '{"table_name":"departments"}' 'http://127.0.0.1:8000/backup_table'` 

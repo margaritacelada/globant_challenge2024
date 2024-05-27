@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
-from typing import Optional
 import sqlite3
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -19,7 +18,8 @@ allowed_tables = ["departments", "jobs", "hired_employees"]
 class BatchInput(BaseModel):
     file_name: str
     table_name: str
-    nrows: Optional[int] = 1000
+    ini_row: int 
+    final_row: int
 
 class BackupInput(BaseModel):
     table_name: str
@@ -31,24 +31,30 @@ app_globant = FastAPI()
 async def batch_load(batch_arg:BatchInput):
     table_name = batch_arg.table_name
     file = batch_arg.file_name
-    nrows_insert = batch_arg.nrows
+    ini_row = batch_arg.ini_row
+    final_row = batch_arg.final_row
+
+    # validations
+    nrows_insert = final_row - ini_row + 1
 
     if table_name not in allowed_tables:
-        return HTTPException(status_code=404, detail=f"This table {table_name} is not available")
-    if  1 <= nrows_insert < 1000:
-        return HTTPException(status_code=403, detail=f"Invalid batch number rows")
+        return HTTPException(status_code=400, detail=f"This table {table_name} is not available")
+    if  nrows_insert > 1000 or ini_row < 1 or final_row < ini_row:
+        return HTTPException(status_code=400, detail=f"Can not insert more than 1000 records by request and ini_row < final_row")
 
     file_name =  FILE_ROUTE + f'historical_data\\{file}.csv'
 
-    if table_name == 'departments':
+    if table_name == allowed_tables[0]:
         table_schema = department_schema
-    if table_name == 'jobs':
+    if table_name == allowed_tables[1]:
         table_schema = jobs_schema
-    if table_name == 'hired_employees':
+    if table_name == allowed_tables[2]:
         table_schema = hired_employees_schema
 
     table_cols = list(table_schema.keys())
-    df = pd.read_csv(file_name, sep=',', names=table_cols, nrows=nrows_insert)
+    df = pd.read_csv(file_name, sep=',', names=table_cols, skiprows=ini_row-1 ,nrows=nrows_insert)
+    if len(df.index) == 0:
+        return f"There's no more available records to load in table {table_name}"
     
     # historical records with missing values shouldn't be inserted
     df_nulls = df[df.isnull().any(axis=1)]
