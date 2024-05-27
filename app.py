@@ -4,9 +4,10 @@ from typing import Optional
 import sqlite3
 import pandas as pd
 from sqlalchemy import create_engine, text
+import pandavro as pdv
 
 
-FILE_ROUTE = 'C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\historical_data\\'
+FILE_ROUTE = 'C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\'
 
 engine = create_engine('sqlite:///C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\globant.db', echo=False)
 
@@ -19,6 +20,9 @@ class BatchInput(BaseModel):
     file_name: str
     table_name: str
     nrows: Optional[int] = 1000
+
+class BackupInput(BaseModel):
+    table_name: str
 
 app_globant = FastAPI()
 
@@ -33,7 +37,7 @@ async def batch_load(batch_arg:BatchInput):
     if  1 <= nrows_insert < 1000:
         return HTTPException(status_code=403, detail=f"Invalid batch number rows")
 
-    file_name =  FILE_ROUTE + f'{file}.csv'
+    file_name =  FILE_ROUTE + f'historical_data\\{file}.csv'
 
     if table_name == 'departments':
         table_schema = department_schema
@@ -90,5 +94,44 @@ async def batch_load(batch_arg:BatchInput):
         response_header = "Batch load was unsuccessful "
 
     response = response_header + response_end
+
+    return response
+
+@app_globant.post("/backup_table")
+async def backup_table(backup_args:BackupInput):
+    table_name = backup_args.table_name
+
+    # Check table has data or exist
+    with engine.connect() as con:
+        result = con.execute(text(f"SELECT count(1) FROM {table_name}")).fetchall()
+        
+    if result is None or [x[0] for x in result][0] == 0: 
+        raise HTTPException(status_code=404, detail=f"There's no data in {table_name} or table doesn't exist")
+
+    # read data
+    num_rows = [x[0] for x in result][0]
+    query = f"SELECT * FROM {table_name}"
+    df = pd.read_sql(query, engine)
+
+    # save backup
+    file_name =  FILE_ROUTE + f'bck\\{table_name}.avro'
+    pdv.to_avro(file_name, df)
+
+    response = f"The backup for table {table_name} was succesful, with {num_rows} rows saved"
+
+    return response
+
+@app_globant.post("/restore_table")
+async def restore_table(backup_args:BackupInput):
+    table_name = backup_args.table_name
+    file_name =  FILE_ROUTE + f'bck\\{table_name}.avro'
+    df = pdv.read_avro(file_name)
+    
+    with engine.connect() as con:
+        con.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
+
+    rows_inserted = df.to_sql(table_name, engine, if_exists='append',index=False)
+    engine.connect().commit()
+    response = f"Table {table_name} succesfully restored with {rows_inserted} rows inserted"
 
     return response
