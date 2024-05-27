@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
 import sqlite3
@@ -26,6 +26,7 @@ class BackupInput(BaseModel):
 
 app_globant = FastAPI()
 
+# Challenge 1
 @app_globant.post("/batch_load")
 async def batch_load(batch_arg:BatchInput):
     table_name = batch_arg.table_name
@@ -135,3 +136,51 @@ async def restore_table(backup_args:BackupInput):
     response = f"Table {table_name} succesfully restored with {rows_inserted} rows inserted"
 
     return response
+
+# Challenge 2
+@app_globant.get("/hired_employees_q")
+async def hired_employees_q():
+    
+    # check if there's data
+    for table in allowed_tables:
+        with engine.connect() as con:
+            result = con.execute(text(f"SELECT count(1) FROM {table}")).fetchall()
+            if result is None or [x[0] for x in result][0] == 0: 
+                raise HTTPException(status_code=404, detail=f"There's no data in {table} or table doesn't exist")
+    
+    # get metrics
+    query = """
+        with all_quarters AS (
+            SELECT 
+                d.department,
+                j.job,
+                CASE
+                    WHEN strftime('%m', h.datetime) BETWEEN '01' AND '03' THEN 'Q1'
+                    WHEN strftime('%m', h.datetime) BETWEEN '04' AND '06' THEN 'Q2'
+                    WHEN strftime('%m', h.datetime) BETWEEN '07' AND '09' THEN 'Q3'
+                    ELSE 'Q4'
+                END AS quarter
+            FROM hired_employees h
+                JOIN departments d ON d.id = h.department_id
+                JOIN jobs j ON j.id = h.job_id
+            WHERE strftime('%Y', datetime) = '2021'
+            )
+            SELECT
+                department,
+                job,
+                sum(CAST(quarter = 'Q1' as integer)) AS Q1,
+                sum(CAST(quarter = 'Q2' as integer)) AS Q2,
+                sum(CAST(quarter = 'Q3' as integer)) AS Q3,
+                sum(CAST(quarter = 'Q4' as integer)) AS Q4
+            FROM all_quarters
+            GROUP BY department,job
+            ORDER BY department,job;
+        """
+    df = pd.read_sql(query, engine)
+    # only for data visualization
+    # file_name =  FILE_ROUTE + f'metrics\\hired_employees_by_q.csv'
+    # df.to_csv(file_name,index=False) only for data visualization
+
+    return Response(df.to_json(orient="records"), media_type="application/json")
+
+

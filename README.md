@@ -23,6 +23,9 @@
 - Call post method to restore table
 `curl -X POST -H "Content-Type: application/json" -d '{"table_name":"departments"}' 'http://127.0.0.1:8000/restore_table'` 
 
+- Call get method to get metrics hired employees by quarter
+`curl -X GET http://127.0.0.1:8000/hired_employees_q` 
+
 #### Deployment (Draft)
 Repository includes a basic Dockerfile whit basic commands trying to show the content
 `docker build -t globant_challenge .` 
