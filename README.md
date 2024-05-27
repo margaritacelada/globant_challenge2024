@@ -22,3 +22,7 @@
 
 - Call post method to restore table
 `curl -X POST -H "Content-Type: application/json" -d '{"table_name":"departments"}' 'http://127.0.0.1:8000/restore_table'` 
+
+#### Deployment (Draft)
+Repository includes a basic Dockerfile whit basic commands trying to show the content
+`docker build -t globant_challenge .` 
