@@ -8,13 +8,6 @@ import pandavro as pdv
 
 FILE_ROUTE = 'C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\'
 
-engine = create_engine('sqlite:///C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\globant.db', echo=False)
-
-department_schema = {'id':'int32','department':'str'}
-hired_employees_schema = {'id':'int32','name':'str','datetime':'str','department_id':'int32','job_id':'int32'}
-jobs_schema = {'id':'int32','job':'str'}
-allowed_tables = ["departments", "jobs", "hired_employees"]
-
 class BatchInput(BaseModel):
     file_name: str
     table_name: str
@@ -24,16 +17,15 @@ class BatchInput(BaseModel):
 class BackupInput(BaseModel):
     table_name: str
 
-app_globant = FastAPI()
+engine = create_engine('sqlite:///C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\globant.db', echo=False)
 
-# Challenge 1
-@app_globant.post("/batch_load")
-async def batch_load(batch_arg:BatchInput):
-    table_name = batch_arg.table_name
-    file = batch_arg.file_name
-    ini_row = batch_arg.ini_row
-    final_row = batch_arg.final_row
+department_schema = {'id':'int32','department':'str'}
+hired_employees_schema = {'id':'int32','name':'str','datetime':'str','department_id':'int32','job_id':'int32'}
+jobs_schema = {'id':'int32','job':'str'}
+allowed_tables = ["departments", "jobs", "hired_employees"]
 
+
+def load_data(table_name:str, file:str, ini_row:int, final_row:int):
     # validations
     nrows_insert = final_row - ini_row + 1
 
@@ -65,7 +57,7 @@ async def batch_load(batch_arg:BatchInput):
     try:
         df = df.astype(table_schema)
     except:
-        HTTPException(status_code=406, detail=f"input data for table {table_name} is not valid. Expected {table_schema} ")
+        HTTPException(status_code=400, detail=f"input data for table {table_name} is not valid. Expected {table_schema} ")
     
     # historical records with duplicated ids shouldn't be inserted
     id_dup_mask = df.duplicated(subset=['id'], keep=False)
@@ -104,16 +96,13 @@ async def batch_load(batch_arg:BatchInput):
 
     return response
 
-@app_globant.post("/backup_table")
-async def backup_table(backup_args:BackupInput):
-    table_name = backup_args.table_name
-
+def create_table_bck(table_name:str):
     # Check table has data or exist
     with engine.connect() as con:
         result = con.execute(text(f"SELECT count(1) FROM {table_name}")).fetchall()
         
     if result is None or [x[0] for x in result][0] == 0: 
-        raise HTTPException(status_code=404, detail=f"There's no data in {table_name} or table doesn't exist")
+        raise HTTPException(status_code=400, detail=f"There's no data in {table_name} or table doesn't exist")
 
     # read data
     num_rows = [x[0] for x in result][0]
@@ -128,9 +117,7 @@ async def backup_table(backup_args:BackupInput):
 
     return response
 
-@app_globant.post("/restore_table")
-async def restore_table(backup_args:BackupInput):
-    table_name = backup_args.table_name
+def restore_table_from_avro(table_name:str):
     file_name =  FILE_ROUTE + f'bck\\{table_name}.avro'
     df = pdv.read_avro(file_name)
     
@@ -143,10 +130,7 @@ async def restore_table(backup_args:BackupInput):
 
     return response
 
-# Challenge 2
-@app_globant.get("/hired_employees_q")
-async def hired_employees_q():
-    
+def get_metrics_he_by_q():
     # check if there's data
     for table in allowed_tables:
         with engine.connect() as con:
@@ -185,13 +169,12 @@ async def hired_employees_q():
     df = pd.read_sql(query, engine)
     # only for data visualization
     # file_name =  FILE_ROUTE + f'metrics\\hired_employees_by_q.csv'
-    # df.to_csv(file_name,index=False) only for data visualization
+    # df.to_csv(file_name,index=False)
 
     return Response(df.to_json(orient="records"), media_type="application/json")
 
-@app_globant.get("/hired_employees_dep")
-async def hired_employees_dep():
-     # check if there's data
+def get_metrics_he_by_dep():
+         # check if there's data
     for table in allowed_tables:
         with engine.connect() as con:
             result = con.execute(text(f"SELECT count(1) FROM {table}")).fetchall()
@@ -220,7 +203,41 @@ async def hired_employees_dep():
     df = pd.read_sql(query, engine)
     # only for data visualization
     # file_name =  FILE_ROUTE + f'metrics\\hired_employees_greater_mean.csv'
-    # df.to_csv(file_name,index=False) # only for data visualization
+    # df.to_csv(file_name,index=False)
 
     return Response(df.to_json(orient="records"), media_type="application/json")
+
+
+app_globant = FastAPI()
+
+# Challenge 1
+@app_globant.post("/batch_load")
+async def batch_load(batch_arg:BatchInput):
+    table_name = batch_arg.table_name
+    file = batch_arg.file_name
+    ini_row = batch_arg.ini_row
+    final_row = batch_arg.final_row
+    return load_data(table_name, file, ini_row, final_row)
+
+
+@app_globant.post("/backup_table")
+async def backup_table(backup_args:BackupInput):
+    table_name = backup_args.table_name
+    return create_table_bck(table_name)
     
+
+@app_globant.post("/restore_table")
+async def restore_table(backup_args:BackupInput):
+    table_name = backup_args.table_name
+    return restore_table_from_avro(table_name)
+
+
+# Challenge 2
+@app_globant.get("/hired_employees_q")
+async def hired_employees_q():
+    return get_metrics_he_by_q()
+
+
+@app_globant.get("/hired_employees_dep")
+async def hired_employees_dep():
+    return get_metrics_he_by_dep()
