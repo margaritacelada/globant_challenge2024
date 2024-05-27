@@ -1,14 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 import sqlite3
 import pandas as pd
 from sqlalchemy import create_engine, text
 
 
 FILE_ROUTE = 'C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\historical_data\\'
-
-#con = sqlite3.connect("globant.db")
-#cur = con.cursor()
 
 engine = create_engine('sqlite:///C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\globant.db', echo=False)
 
@@ -17,16 +15,25 @@ hired_employees_schema = {'id':'int32','name':'str','datetime':'str','department
 jobs_schema = {'id':'int32','job':'str'}
 allowed_tables = ["departments", "jobs", "hired_employees"]
 
+class BatchInput(BaseModel):
+    file_name: str
+    table_name: str
+    nrows: Optional[int] = 1000
+
 app_globant = FastAPI()
 
 @app_globant.post("/batch_load")
-async def batch_load(table_name:str):
+async def batch_load(batch_arg:BatchInput):
+    table_name = batch_arg.table_name
+    file = batch_arg.file_name
+    nrows_insert = batch_arg.nrows
 
-    nrows_insert = 1000
-    file_name =  FILE_ROUTE + f'{table_name}.csv'
-    
     if table_name not in allowed_tables:
         return HTTPException(status_code=404, detail=f"This table {table_name} is not available")
+    if  1 <= nrows_insert < 1000:
+        return HTTPException(status_code=403, detail=f"Invalid batch number rows")
+
+    file_name =  FILE_ROUTE + f'{file}.csv'
 
     if table_name == 'departments':
         table_schema = department_schema
@@ -35,7 +42,6 @@ async def batch_load(table_name:str):
     if table_name == 'hired_employees':
         table_schema = hired_employees_schema
 
-    #df = pd.read_csv( f'C:\\Users\\ASUS\\Desktop\\Globant\\globant_challenge2024\\historical_data\\{file}.csv',sep=',', header=0)
     table_cols = list(table_schema.keys())
     df = pd.read_csv(file_name, sep=',', names=table_cols, nrows=nrows_insert)
     
@@ -54,7 +60,6 @@ async def batch_load(table_name:str):
     id_dup_mask = df.duplicated(subset=['id'], keep=False)
     id_dups = df.loc[id_dup_mask, 'id'].tolist()
     df.drop_duplicates(subset=['id'], inplace=True)
-    # df.reset_index(inplace=True)
 
     # if there's data in the db, don't insert ids that already exist
     with engine.connect() as con:
