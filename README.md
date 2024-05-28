@@ -38,7 +38,7 @@ Two get methods to retrieve stakeholders requirements. The response is in json f
 | metrics | folder with csv files wich have the query results for challenge 2. *Only for visualization purposes* |
 | bck| folder with table backups in AVRO format *location where backup_table method saves the result* |
 | historical_data |  folder with csv files with historical data to load into sqlite tables |
-
+| Challenge 2 question 1.pbix |  PowerBI file with data visualization question 1 of challenge 2|
 
 #### Commands 
 The following commands shows how to call the API
@@ -66,10 +66,14 @@ The following commands shows how to call the API
 - Call get method to get metrics hired employees by department greater that 2021 mean
 `curl -X GET http://127.0.0.1:8000/hired_employees_dep` 
 
-#### Evidence
+#### App functionality and data visualization
 The following screenshot shows that app_globant is functional
 
 ![alt text](Globant_API_Challenge_execution_P1.jpg)
+
+This is how data visualization looks for challenge 2 question 1 using PowerBI
+
+![alt text](<Challenge 2 question 1 PowerBI visualization.jpg>)
 
 #### *Deployment (Draft)*
 Repository includes a basic Dockerfile that is not yet functional 
