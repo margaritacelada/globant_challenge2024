@@ -1,8 +1,8 @@
 # Base image
-FROM python:3.9
+FROM mcr.microsoft.com/azure-functions/python:4-python3.11
 
 # Work directory /app
-WORKDIR /app
+WORKDIR /globant_challenge2024
 
 # Copy requirements.txt file in the container 
 COPY requirements.txt .
@@ -10,8 +10,8 @@ COPY requirements.txt .
 # Install dependencies from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all work directory content into container in /app
+# Copy all work directory content into container in /globant_challenge2024
 COPY . .
 
-# execute applicationEjecuta tu aplicación
+# execute application
 # CMD ["python", "tu_script.py"]

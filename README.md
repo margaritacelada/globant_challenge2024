@@ -76,5 +76,8 @@ This is how data visualization looks for challenge 2 question 1 using PowerBI
 ![alt text](<Challenge 2 question 1 PowerBI visualization.jpg>)
 
 #### *Deployment (Draft)*
-Repository includes a basic Dockerfile that is not yet functional 
+Repository includes a basic Dockerfile that is not yet functional, not for production purposes.
+
 `docker build -t globant_challenge .` 
+
+According to the cloud server choosen, you need to build and push the image in the container.
